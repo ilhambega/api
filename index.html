@@ -135,5 +135,13 @@ setInterval(()=>{
   el.textContent=Math.ceil(left/1000)+" с";
   const b=$("#bar");if(b)b.style.width=(left/total*100)+"%";
 },250);
+  let ticked=null;
+setInterval(()=>{
+  if(SCREEN||!st||st.status!=="open"||!st.opened_at||ticked===st.slot)return;
+  if(new Date(st.opened_at).getTime()+st.seconds*1000<Date.now()+offset){
+    ticked=st.slot;
+    setTimeout(()=>api({action:"tick"}).then(render),2500);
+  }
+},500);
 SCREEN?initScreen():initPlayer();
 </script></body></html>
