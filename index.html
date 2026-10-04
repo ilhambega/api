@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="ru"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Биржа маркетинга</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#0e1621;color:#e8eef5;font:16px system-ui,sans-serif;padding:12px}
+h1{font-size:22px;margin:4px 0 12px}h2{margin:0 0 10px}h3{margin:16px 0 8px}
+small{display:block;opacity:.65}
+.card{background:#17212e;border-radius:14px;padding:14px;margin-bottom:10px}
+.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.cap{font-size:22px;font-weight:700}.up{color:#3ddc84}.dn{color:#ff5c5c}
+.btn,.opt,.bet{display:block;width:100%;border:0;border-radius:12px;padding:13px;margin-top:8px;font-size:16px;color:#fff;background:#2b5278;text-align:left}
+.btn.off{opacity:.35}.opt b{display:inline-block;width:26px}
+.bet{background:#3a3f4b;text-align:center}.bet.on{background:#b8860b}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.grid .btn{margin:0;text-align:center}
+input{width:100%;padding:13px;border-radius:12px;border:0;font-size:16px;background:#0e1621;color:#fff}
+.q{font-size:18px;margin:12px 0;white-space:pre-wrap}.tm{font-size:34px;font-weight:700;text-align:center}
+.bar{height:6px;background:#0e1621;border-radius:3px;margin:8px 0}.bar i{display:block;height:100%;background:#3ddc84;border-radius:3px;transition:width .25s}
+.res{text-align:center}.big{font-size:34px;font-weight:700}
+.row{display:flex;align-items:center;gap:10px;padding:8px 10px;background:#17212e;border-radius:10px;margin-bottom:6px}
+.row.me{outline:2px solid #3ddc84}.row b{width:22px;opacity:.7}
+.nm{flex:1;position:relative;display:flex;flex-direction:column;gap:2px}.nm span{font-weight:600}.nm small{font-size:12px}
+.nm i{display:block;height:4px;background:#3ddc84;border-radius:2px;margin-top:3px}
+.row em{font-style:normal;font-weight:700}
+body.screen{padding:24px;font-size:24px}body.screen h1{font-size:44px}body.screen .tm{font-size:90px}
+body.screen .q{font-size:28px}body.screen .row{padding:14px 18px}body.screen .nm small{font-size:18px}
+.tp{font-size:28px;opacity:.8}
+</style></head><body><div id="app"></div>
+<script>
+const SB_URL="https://taakwizrxfzysfihepfk.supabase.co";
+const SB_KEY="sb_publishable_pWOw02YxGCS42hc7PPBNiA_zsR7Jc6S";
+const SCREEN=new URLSearchParams(location.search).has("screen");
+const tg=window.Telegram?.WebApp;tg?.ready();tg?.expand();
+const sb=supabase.createClient(SB_URL,SB_KEY);
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const fmt=n=>(Math.round(n*10)/10).toString();
+let offset=0,st=null,bet=false,teams=[],me=null,lastKey="",lastView="",curQ=null,lastData=null;
+
+async function api(body={}){
+  const r=await fetch(SB_URL+"/functions/v1/api",{method:"POST",
+    headers:{"content-type":"application/json","x-init-data":tg?.initData||""},body:JSON.stringify(body)});
+  return r.json();
+}
+async function loadTeams(){
+  const{data}=await sb.from("teams").select("id,name,company,capital").not("company","is",null).order("capital",{ascending:false});
+  teams=data||[];drawLB();
+}
+function drawLB(){
+  const el=$("#lb");if(!el)return;
+  const max=Math.max(100,...teams.map(t=>t.capital));
+  el.innerHTML=teams.map((t,i)=>`<div class="row ${t.id===me?"me":""}"><b>${i+1}</b><div class="nm"><span>${esc(t.company)}</span><small>${esc(t.name)}</small><i style="width:${Math.max(4,t.capital/max*100)}%"></i></div><em class="${t.capital>=100?"up":"dn"}">${fmt(t.capital)}</em></div>`).join("");
+}
+function render(d){
+  if(!d||d.error)return;
+  lastData=d;me=d.team?.id??null;st=d.state;offset=d.now-Date.now();
+  if((d.q?.id??null)!==curQ){curQ=d.q?.id??null;bet=false;}
+  const t=d.team;
+  if(!t){
+    if(lastView==="form")return;
+    lastView="form";lastKey="";
+    $("#app").innerHTML=`<div class="card"><h2>Регистрация команды</h2><input id="nm" maxlength="40" placeholder="Название команды"><button class="btn" onclick="mkTeam()">Создать</button></div>`;
+    return;
+  }
+  const key=JSON.stringify([d.team,d.state,d.q?.id,d.result,d.taken,bet]);
+  if(key===lastKey)return;
+  lastKey=key;lastView="main";
+  let body="";
+  if(!t.company){
+    body=`<div class="card"><h2>Выберите компанию</h2><div class="grid">`+d.companies.map(c=>{const off=d.taken.includes(c);return `<button class="btn ${off?"off":""}" ${off?"disabled":""} data-c="${esc(c)}" onclick="pickCo(this.dataset.c)">${esc(c)}</button>`}).join("")+`</div></div>`;
+  }else if(d.q&&st.status!=="lobby"){
+    if(d.result){
+      const r=d.result;
+      body=`<div class="card res"><div class="big ${r.delta>=0?"up":"dn"}">${r.delta>0?"+":""}${fmt(r.delta)} млн</div>${r.bet?"<small>ставка ×2</small>":""}<p>💡 ${esc(r.why)}</p><small>Ждите следующий вопрос</small></div>`;
+    }else if(st.status==="open"){
+      body=`<div class="card"><small>Тема ${esc(d.q.topic)} · ${esc(d.q.level)} · ставка ±${d.q.stake} млн</small><div class="bar"><i id="bar"></i></div><div id="tm" class="tm"></div><p class="q">${esc(d.q.body)}</p><button class="bet ${bet?"on":""}" onclick="toggleBet()">🎲 Ставка ×2: ${bet?"ВКЛ":"выкл"}</button>`+d.q.options.map((o,i)=>`<button class="opt" onclick="pick(${i})"><b>${"ABCD"[i]}</b> ${esc(o.t)}</button>`).join("")+`</div>`;
+    }else body=`<div class="card">Время вышло ⏱ Ждите следующий вопрос</div>`;
+  }else body=`<div class="card">Ждём первый вопрос…</div>`;
+  $("#app").innerHTML=`<div class="top"><div><b>${esc(t.company||"—")}</b><small>${esc(t.name)}</small></div><div class="cap ${t.capital>=100?"up":"dn"}">${fmt(t.capital)} млн</div></div>${body}<h3>Рейтинг</h3><div id="lb"></div>`;
+  drawLB();
+}
+async function mkTeam(){
+  const name=$("#nm").value.trim();if(!name)return;
+  const r=await api({action:"team",name});
+  if(r.error){tg?.showAlert?.(r.error);return;}
+  lastView="";render(r);
+}
+async function pickCo(c){
+  const r=await api({action:"company",company:c});
+  if(r.error){tg?.showAlert?.(r.error);lastKey="";refresh();return;}
+  render(r);
+}
+function toggleBet(){bet=!bet;render(lastData);}
+async function pick(pos){
+  document.querySelectorAll(".opt").forEach(b=>b.disabled=true);
+  const r=await api({action:"answer",pos,bet});
+  if(r.error){tg?.showAlert?.(r.error);lastKey="";refresh();return;}
+  render(r);
+}
+async function refresh(){
+  try{
+    const d=await api();
+    if(d.error==="auth"){$("#app").innerHTML=`<div class="card">Откройте игру через Telegram-бота.</div>`;return;}
+    render(d);
+  }catch(e){}
+}
+function initPlayer(){
+  refresh();loadTeams();
+  sb.channel("p").on("postgres_changes",{event:"*",schema:"public",table:"game_state"},refresh)
+    .on("postgres_changes",{event:"*",schema:"public",table:"teams"},()=>{loadTeams();refresh();}).subscribe();
+  setInterval(refresh,3000);
+}
+function initScreen(){
+  document.body.classList.add("screen");
+  $("#app").innerHTML=`<h1>📈 БИРЖА МАРКЕТИНГА</h1><div id="tp" class="tp"></div><div id="tm" class="tm"></div><div class="bar"><i id="bar"></i></div><div id="tx" class="q"></div><div id="lb"></div>`;
+  const upd=async()=>{
+    const{data}=await sb.from("game_state").select("*").eq("id",1).single();
+    st=data;
+    $("#tp").textContent=st.status==="lobby"?"Ожидание начала игры":(st.screen_topic||"");
+    $("#tx").textContent=st.screen_text||(st.status==="lobby"?"":"Вопрос — на экранах команд");
+  };
+  upd();loadTeams();
+  sb.channel("s").on("postgres_changes",{event:"*",schema:"public",table:"game_state"},upd)
+    .on("postgres_changes",{event:"*",schema:"public",table:"teams"},loadTeams).subscribe();
+  setInterval(()=>{upd();loadTeams();},4000);
+}
+setInterval(()=>{
+  const el=$("#tm");if(!el||!st)return;
+  if(st.status!=="open"||!st.opened_at){el.textContent=st.status==="closed"?"Приём закрыт":"";return;}
+  const total=st.seconds*1000;
+  const left=Math.max(0,new Date(st.opened_at).getTime()+total-(Date.now()+offset));
+  el.textContent=Math.ceil(left/1000)+" с";
+  const b=$("#bar");if(b)b.style.width=(left/total*100)+"%";
+},250);
+SCREEN?initScreen():initPlayer();
+</script></body></html>
