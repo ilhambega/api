@@ -28,6 +28,8 @@ input{width:100%;padding:13px;border-radius:12px;border:0;font-size:16px;backgro
 body.screen{padding:24px;font-size:24px}body.screen h1{font-size:44px}body.screen .tm{font-size:90px}
 body.screen .q{font-size:28px}body.screen .row{padding:14px 18px}body.screen .nm small{font-size:18px}
 .tp{font-size:28px;opacity:.8}
+.opt.sel{background:#1f8f5f;outline:2px solid #3ddc84}
+.conf{background:#1f8f5f;text-align:center;margin-top:14px}
 </style></head><body><div id="app"></div>
 <script>
 const SB_URL="https://taakwizrxfzysfihepfk.supabase.co";
@@ -75,7 +77,7 @@ function render(d){
       const r=d.result;
       body=`<div class="card res"><div class="big ${r.delta>=0?"up":"dn"}">${r.delta>0?"+":""}${fmt(r.delta)} млн</div>${r.bet?"<small>ставка ×2</small>":""}<p>💡 ${esc(r.why)}</p><small>Ждите следующий вопрос</small></div>`;
     }else if(st.status==="open"){
-      body=`<div class="card"><small>Тема ${esc(d.q.topic)} · ${esc(d.q.level)} · ставка ±${d.q.stake} млн</small><div class="bar"><i id="bar"></i></div><div id="tm" class="tm"></div><p class="q">${esc(d.q.body)}</p><button class="bet ${bet?"on":""}" onclick="toggleBet()">🎲 Ставка ×2: ${bet?"ВКЛ":"выкл"}</button>`+d.q.options.map((o,i)=>`<button class="opt" onclick="pick(${i})"><b>${"ABCD"[i]}</b> ${esc(o.t)}</button>`).join("")+`</div>`;
+      body=`<div class="card"><small>Тема ${esc(d.q.topic)} · ${esc(d.q.level)} · ставка ±${d.q.stake} млн</small><div class="bar"><i id="bar"></i></div><div id="tm" class="tm"></div><p class="q">${esc(d.q.body)}</p><button class="bet ${bet?"on":""}" onclick="toggleBet()">🎲 Ставка ×2: ${bet?"ВКЛ":"выкл"}</button>`+d.q.options.map((o,i)=>`<button class="opt ${sel===i?"sel":""}" onclick="pick(${i})"><b>${"ABCD"[i]}</b> ${esc(o.t)}</button>`).join("")+`<button class="btn conf ${sel===null?"off":""}" ${sel===null?"disabled":""} onclick="confirmAns()">✅ Подтвердить ответ</button>`+`</div>`;
     }else body=`<div class="card">Время вышло ⏱ Ждите следующий вопрос</div>`;
   }else body=`<div class="card">Ждём первый вопрос…</div>`;
   $("#app").innerHTML=`<div class="top"><div><b>${esc(t.company||"—")}</b><small>${esc(t.name)}</small></div><div class="cap ${t.capital>=100?"up":"dn"}">${fmt(t.capital)} млн</div></div>${body}<h3>Рейтинг</h3><div id="lb"></div>`;
@@ -87,8 +89,11 @@ async function mkTeam(){
   if(r.error){tg?.showAlert?.(r.error);return;}
   lastView="";render(r);
 }
-async function pickCo(c){
-  const r=await api({action:"company",company:c});
+function pick(i){sel=(sel===i?null:i);render(lastData,true);}
+async function confirmAns(){
+  if(sel===null)return;
+  document.querySelectorAll(".opt,.conf,.bet").forEach(b=>b.disabled=true);
+  const r=await api({action:"answer",pos:sel,bet});
   if(r.error){tg?.showAlert?.(r.error);lastKey="";refresh();return;}
   render(r);
 }
