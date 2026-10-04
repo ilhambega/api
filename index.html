@@ -38,8 +38,7 @@ const sb=supabase.createClient(SB_URL,SB_KEY);
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const fmt=n=>(Math.round(n*10)/10).toString();
-let offset=0,st=null,bet=false,teams=[],me=null,lastKey="",lastView="",curQ=null,lastData=null;
-
+let offset=0,st=null,bet=false,sel=null,teams=[],me=null,lastKey="",lastView="",curQ=null,lastData=null;
 async function api(body={}){
   const r=await fetch(SB_URL+"/functions/v1/api",{method:"POST",
     headers:{"content-type":"application/json","x-init-data":tg?.initData||""},body:JSON.stringify(body)});
@@ -57,7 +56,7 @@ function drawLB(){
 function render(d){
   if(!d||d.error)return;
   lastData=d;me=d.team?.id??null;st=d.state;offset=d.now-Date.now();
-  if((d.q?.id??null)!==curQ){curQ=d.q?.id??null;bet=false;}
+  if((d.q?.id??null)!==curQ){curQ=d.q?.id??null;bet=false;sel=null;}
   const t=d.team;
   if(!t){
     if(lastView==="form")return;
@@ -65,7 +64,7 @@ function render(d){
     $("#app").innerHTML=`<div class="card"><h2>Регистрация команды</h2><input id="nm" maxlength="40" placeholder="Название команды"><button class="btn" onclick="mkTeam()">Создать</button></div>`;
     return;
   }
-  const key=JSON.stringify([d.team,d.state,d.q?.id,d.result,d.taken,bet]);
+  const key=JSON.stringify([d.team,d.state,d.q?.id,d.result,d.taken,bet,sel]);
   if(key===lastKey)return;
   lastKey=key;lastView="main";
   let body="";
