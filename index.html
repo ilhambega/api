@@ -1,0 +1,298 @@
+<!doctype html>
+<html lang="ru"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Биржа маркетинга</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@500;700;800&family=Oswald:wght@500;600;700&display=swap" rel="stylesheet">
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{--felt:#0d3b33;--felt-d:#082a24;--felt-l:#14493f;--line:#2c6256;--chalk:#f1ede2;--mut:#9fbdb3;--brass:#e0a93b;--brass-d:#2a1d03;--gain:#a6f0b4;--loss:#ff8a73;--tile:#05201b}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html{background:var(--felt)}
+body{margin:0;background:var(--felt);color:var(--chalk);font:500 16px/1.4 "Golos Text",system-ui,sans-serif;padding:16px 14px calc(24px + env(safe-area-inset-bottom,0px));padding-top:calc(16px + env(safe-area-inset-top,0px));min-height:100vh}
+h1,h2,.num,.fl,.fs,.tm{font-family:Oswald,"Arial Narrow",system-ui,sans-serif}
+h1{font-size:34px;line-height:1.05;margin:0 0 8px;font-weight:700;letter-spacing:.01em}
+h2{font-size:22px;margin:0 0 6px;font-weight:600}
+h3{font-family:Oswald,system-ui,sans-serif;font-size:20px;font-weight:600;margin:22px 0 8px}
+p{margin:0}small{display:block;color:var(--mut);font-size:13px}
+.up{color:var(--gain)}.dn{color:var(--loss)}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible,input:focus-visible{outline:2px solid var(--brass);outline-offset:2px}
+
+.panel{background:var(--felt-d);border:1px solid var(--line);border-radius:6px;padding:14px;margin-bottom:12px}
+.sub{color:var(--mut);margin-bottom:12px}
+input{width:100%;padding:14px;border-radius:6px;border:1px solid var(--line);font:inherit;background:var(--tile);color:var(--chalk)}
+.btn{display:block;width:100%;border:0;border-radius:6px;padding:15px;margin-top:12px;font-weight:800;font-size:16px;text-align:center;background:var(--brass);color:var(--brass-d)}
+.btn:disabled,.btn.off{background:var(--felt-l);color:var(--mut);cursor:default}
+
+/* табло */
+.fls{display:inline-flex;gap:4px;perspective:600px;vertical-align:middle}
+.fl{display:inline-grid;place-items:center;min-width:.68em;padding:0 .08em;height:1.28em;line-height:1;font-weight:600;color:var(--chalk);background:linear-gradient(to bottom,#0a2e27 0 49%,#031612 50% 100%);border-radius:4px;position:relative;font-variant-numeric:tabular-nums;font-size:56px}
+.fl::after{content:"";position:absolute;left:0;right:0;top:50%;height:2px;background:#000;opacity:.5}
+.fs{display:inline-grid;align-items:end;height:1.28em;font-size:56px;font-weight:600;line-height:1.28;padding:0 .02em}
+.fls.sm .fl{font-size:22px}.fls.sm .fs{font-size:22px}
+.fls.md .fl{font-size:44px}.fls.md .fs{font-size:44px}
+.flip{animation:flip .55s cubic-bezier(.2,.7,.2,1) both}
+@keyframes flip{0%{transform:rotateX(-90deg);opacity:.2}60%{transform:rotateX(12deg);opacity:1}100%{transform:rotateX(0)}}
+
+.hd{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+.hd .who b{font-size:19px}
+.mono{flex:none;width:38px;height:38px;border-radius:4px;background:var(--cc,#444);display:grid;place-items:center;font-size:21px}
+.who{min-width:0}.who b{display:block;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cap{display:flex;flex-direction:column;gap:6px}
+.capt{display:flex;justify-content:space-between;align-items:baseline}
+
+.meta{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+.tag{border:1px solid var(--line);border-radius:4px;padding:3px 9px;font-size:13px;font-weight:700;color:var(--chalk)}
+.tag.lv::before{content:"";display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:7px;background:var(--brass)}
+.tag.lv.easy::before{background:var(--gain)}.tag.lv.hard::before{background:var(--loss)}
+.tag.stake{border-color:var(--brass);color:var(--brass)}
+.tbox{display:flex;align-items:center;gap:14px;margin-bottom:14px}
+.tm{font-size:40px;font-weight:700;min-width:64px;text-align:right;font-variant-numeric:tabular-nums;line-height:1}
+.fuse{flex:1;height:8px;background:var(--tile);border-radius:2px;overflow:hidden}
+.fuse i{display:block;height:100%;width:100%;background:var(--brass);transition:width .25s linear,background .3s}
+.tbox.hot .fuse i{background:var(--loss)}.tbox.hot .tm{color:var(--loss)}
+.tbox .tm{order:-1}
+.q{font-size:19px;line-height:1.45;font-weight:700;margin:2px 0 14px;white-space:pre-wrap}
+
+.sw{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;text-align:left;background:transparent;border:1px solid var(--line);border-radius:6px;padding:11px 12px;margin-bottom:10px}
+.sw b{display:block}.sw small{margin-top:1px}
+.sw .pill{flex:none;width:46px;height:26px;border-radius:13px;background:var(--tile);position:relative;border:1px solid var(--line)}
+.sw .pill::after{content:"";position:absolute;top:2px;left:2px;width:20px;height:20px;border-radius:50%;background:var(--mut);transition:left .2s,background .2s}
+.sw.on{border-color:var(--brass)}.sw.on .pill{background:#4a3a10}.sw.on .pill::after{left:22px;background:var(--brass)}
+
+.opt{display:grid;grid-template-columns:34px 1fr;gap:12px;align-items:start;width:100%;text-align:left;background:transparent;border:1px solid var(--line);border-radius:6px;padding:11px 12px;margin-bottom:8px;line-height:1.35}
+.opt .l{display:grid;place-items:center;width:34px;height:34px;border-radius:4px;border:1px solid var(--line);font-family:Oswald,system-ui,sans-serif;font-size:18px;font-weight:600}
+.opt.sel{background:var(--brass);border-color:var(--brass);color:var(--brass-d);font-weight:700}
+.opt.sel .l{background:var(--brass-d);border-color:var(--brass-d);color:var(--brass)}
+
+.dock{position:sticky;bottom:0;padding:14px 0 2px;margin-top:6px;background:linear-gradient(rgba(8,42,36,0),var(--felt-d) 38%)}
+.dock .btn{margin-top:0}
+
+.cor{display:grid;grid-template-columns:42px 1fr;gap:12px;align-items:center;width:100%;text-align:left;background:transparent;border:1px solid var(--line);border-radius:6px;padding:10px;margin-bottom:8px}
+.cor .mono{width:42px;height:42px;font-size:23px}
+.cor b{display:block;font-weight:700}.cor small{margin-top:1px}
+.cor.sel{border-color:var(--brass);background:rgba(224,169,59,.12)}
+.cor.off{opacity:.38;cursor:default}.cor.off b{text-decoration:line-through}
+
+.res .fls{margin:6px 0 4px}
+.res .why{margin-top:10px;font-weight:600}
+.res small{margin-top:10px}
+.wait{display:flex;align-items:center;gap:12px}
+.pulse{width:10px;height:10px;border-radius:50%;background:var(--brass);animation:pl 1.4s ease-in-out infinite}
+@keyframes pl{0%,100%{opacity:.25}50%{opacity:1}}
+
+.lbr{display:grid;grid-template-columns:26px 38px 1fr auto;gap:10px;align-items:center;padding:9px 0;border-bottom:1px solid var(--line)}
+.lbr:last-child{border-bottom:0}
+.lbr .rk{font-size:22px;font-weight:600;color:var(--mut);text-align:center}
+.lbr.lead .rk{color:var(--brass)}
+.lbr.me{box-shadow:inset 3px 0 0 var(--brass);padding-left:8px;margin-left:-8px;background:rgba(224,169,59,.07)}
+.lbr .val{text-align:right}.lbr .val small{font-size:12px;margin-top:2px;font-weight:700}
+.empty{color:var(--mut);padding:8px 0}
+
+/* экран на монитор */
+body.screen{padding:28px 36px}
+body.screen h1{font-size:56px}
+.shead{display:flex;align-items:baseline;justify-content:space-between;gap:24px;margin-bottom:24px;border-bottom:2px solid var(--brass);padding-bottom:12px}
+.stp{font-size:26px;color:var(--brass);font-weight:700;text-align:right}
+.sgrid{display:grid;grid-template-columns:1fr;gap:28px}
+@media (min-width:900px){.sgrid{grid-template-columns:1fr 1.1fr}}
+body.screen .tm{font-size:96px;min-width:150px}
+body.screen .fuse{height:14px}
+body.screen .q{font-size:32px;line-height:1.4}
+body.screen .lbr{grid-template-columns:44px 56px 1fr auto;padding:12px 0;gap:16px}
+body.screen .lbr .rk{font-size:34px}
+body.screen .mono{width:56px;height:56px;font-size:30px}
+body.screen .who b{font-size:26px}body.screen .who small{font-size:18px}
+body.screen .fls.sm .fl,body.screen .fls.sm .fs{font-size:38px}
+body.screen .lbr .val small{font-size:16px}
+
+@media (prefers-reduced-motion:reduce){.flip,.pulse{animation:none}.fuse i,.sw .pill::after{transition:none}}
+</style></head><body><div id="app"></div>
+<script>
+const SB_URL="https://taakwizrxfzysfihepfk.supabase.co";
+const SB_KEY="sb_publishable_pWOw02YxGCS42hc7PPBNiA_zsR7Jc6S";
+const SCREEN=new URLSearchParams(location.search).has("screen");
+const tg=window.Telegram?.WebApp;
+try{tg?.ready();tg?.expand();tg?.setHeaderColor?.("#0d3b33");tg?.setBackgroundColor?.("#0d3b33");}catch(e){}
+const sb=supabase.createClient(SB_URL,SB_KEY);
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const fmt=n=>(Math.round(n*10)/10).toFixed(1).replace(".",",");
+const sgn=d=>d>0?"+"+fmt(d):d<0?"−"+fmt(-d):"0,0";
+const hap=()=>{try{tg?.HapticFeedback?.impactOccurred?.("light")}catch(e){}};
+const hapN=t=>{try{tg?.HapticFeedback?.notificationOccurred?.(t)}catch(e){}};
+
+const CO={
+ "Coca-Cola":{e:"🥤",c:"#c8102e",t:"Адаптация вкуса и бренда под страну"},
+ "McDonald's":{e:"🍔",c:"#c99a00",t:"Франшиза и локализация меню"},
+ "Samsung":{e:"📱",c:"#1b3ea6",t:"Экспорт и сборка на местах"},
+ "IKEA":{e:"🛋️",c:"#0058a3",t:"Стандартизация против адаптации"},
+ "Apple":{e:"🍎",c:"#6b7478",t:"Премиум-цена и собственные магазины"},
+ "Nike":{e:"👟",c:"#d9561a",t:"Бренд и глобальные коммуникации"},
+ "Toyota":{e:"🚗",c:"#b3121f",t:"Прямые инвестиции и заводы за рубежом"},
+ "Nestlé":{e:"🍫",c:"#6e4f3a",t:"Локальные бренды"},
+ "Netflix":{e:"🎬",c:"#a50b14",t:"Цифровой выход, цена по странам"},
+ "Chevrolet":{e:"🚙",c:"#9a7a2a",t:"Производство в Узбекистане"}
+};
+const coC=n=>CO[n]?.c||"#3b5a52",coE=n=>CO[n]?.e||"🏢";
+
+let offset=0,st=null,bet=false,sel=null,pend=null,teams=[],me=null,lastKey="",lastView="",curQ=null,lastData=null,prevCap=null,ticked=null;
+const prevRow={};
+
+function flaps(s,prev,cls=""){
+  const p=prev==null?null:String(prev);
+  const h=[...String(s)].map((c,i)=>{
+    const sep=/[.,+−\-]/.test(c);
+    const ch=p!==null&&p[i]!==c;
+    return `<span class="${sep?"fs":"fl"}${ch?" flip":""}"${ch?` style="animation-delay:${i*70}ms"`:""}>${esc(c)}</span>`;
+  }).join("");
+  return `<div class="fls ${cls}" aria-label="${esc(s)}">${h}</div>`;
+}
+
+async function api(body={}){
+  const r=await fetch(SB_URL+"/functions/v1/api",{method:"POST",
+    headers:{"content-type":"application/json","x-init-data":tg?.initData||""},body:JSON.stringify(body)});
+  return r.json();
+}
+async function loadTeams(){
+  const{data}=await sb.from("teams").select("id,name,company,capital").not("company","is",null).order("capital",{ascending:false});
+  teams=data||[];drawLB();
+}
+function drawLB(){
+  const el=$("#lb");if(!el)return;
+  const sig=JSON.stringify(teams)+"|"+me;
+  if(el.dataset.sig===sig)return;
+  el.dataset.sig=sig;
+  const rows=teams.map((t,i)=>{
+    const v=fmt(t.capital),d=t.capital-100;
+    const h=`<div class="lbr${t.id===me?" me":""}${i===0?" lead":""}" style="--cc:${coC(t.company)}"><div class="rk">${i+1}</div><div class="mono">${coE(t.company)}</div><div class="who"><b>${esc(t.company)}</b><small>${esc(t.name)}</small></div><div class="val">${flaps(v,prevRow[t.id],"sm")}<small class="${d>=0?"up":"dn"}">${sgn(d)}</small></div></div>`;
+    prevRow[t.id]=v;return h;
+  });
+  el.innerHTML=rows.join("")||`<p class="empty">Команды ещё не выбрали компании.</p>`;
+}
+
+function render(d,local){
+  if(!d||d.error)return;
+  lastData=d;me=d.team?.id??null;st=d.state;if(!local)offset=d.now-Date.now();
+  if((d.q?.id??null)!==curQ){curQ=d.q?.id??null;bet=false;sel=null;}
+  const t=d.team;
+  if(!t){
+    if(lastView==="form")return;
+    lastView="form";lastKey="";
+    $("#app").innerHTML=`<div class="panel"><h1>Биржа маркетинга</h1><p class="sub">Команда управляет международной компанией. Каждое решение двигает капитал.</p><input id="nm" maxlength="40" placeholder="Название команды" autocomplete="off"><button class="btn" onclick="mkTeam()">Создать команду</button></div>`;
+    return;
+  }
+  if(t.company||(pend&&d.taken.includes(pend)))pend=null;
+  const key=JSON.stringify([d.team,d.state,d.q?.id,d.result,d.taken,bet,sel,pend]);
+  if(key===lastKey)return;
+  lastKey=key;lastView="main";
+
+  const capv=fmt(t.capital),delta=t.capital-100;
+  const head=`<div class="hd"><div class="mono" style="--cc:${coC(t.company)}">${t.company?coE(t.company):"🏢"}</div><div class="who"><b>${esc(t.company||"Компания не выбрана")}</b><small>${esc(t.name)}</small></div></div>`+
+    (t.company?`<div class="panel cap"><div class="capt"><small>Капитал, млн $</small><small class="${delta>=0?"up":"dn"}">${sgn(delta)} к старту</small></div>${flaps(capv,prevCap)}</div>`:"");
+  if(t.company)prevCap=capv;
+
+  let body="";
+  if(!t.company){
+    body=`<div class="panel"><h2>Выберите компанию</h2><p class="sub">Выбор на всю игру. Подумайте, чей кейс вам ближе.</p>`+
+      d.companies.map(c=>{
+        const off=d.taken.includes(c);
+        return `<button class="cor${off?" off":""}${pend===c?" sel":""}" style="--cc:${coC(c)}" ${off?"disabled":""} data-c="${esc(c)}" onclick="selCo(this.dataset.c)"><span class="mono">${coE(c)}</span><span><b>${esc(c)}</b><small>${off?"Уже занята другой командой":esc(CO[c]?.t||"")}</small></span></button>`;
+      }).join("")+
+      `<div class="dock"><button class="btn${pend?"":" off"}" ${pend?"":"disabled"} onclick="confirmCo()">${pend?"Подтвердить: "+esc(pend):"Выберите компанию"}</button></div></div>`;
+  }else if(d.q&&st.status!=="lobby"){
+    if(d.result){
+      const r=d.result;
+      body=`<div class="panel res"><small>${r.timeout?"Время вышло, ответа нет":"Результат раунда"}</small>${flaps(sgn(r.delta),"","md "+(r.delta>=0?"up":"dn"))}${r.bet?`<span class="tag stake">ставка ×2</span>`:""}<p class="why">${esc(r.why)}</p><small>Ждите следующий вопрос</small></div>`;
+    }else if(st.status==="open"){
+      const lv={"лёгкий":"easy","средний":"mid","тяжёлый":"hard"}[d.q.level]||"mid";
+      body=`<div class="panel"><div class="meta"><span class="tag">Тема ${esc(d.q.topic)}</span><span class="tag lv ${lv}">${esc(d.q.level)}</span><span class="tag stake">±${d.q.stake} млн</span></div>`+
+        `<div id="tbox" class="tbox"><div id="tm" class="tm"></div><div class="fuse"><i id="bar"></i></div></div>`+
+        `<p class="q">${esc(d.q.body)}</p>`+
+        `<button class="sw${bet?" on":""}" onclick="toggleBet()"><span><b>Ставка ×2</b><small>Выигрыш и проигрыш удваиваются</small></span><span class="pill"></span></button>`+
+        d.q.options.map((o,i)=>`<button class="opt${sel===i?" sel":""}" onclick="pick(${i})"><span class="l">${"ABCD"[i]}</span><span>${esc(o.t)}</span></button>`).join("")+
+        `<div class="dock"><button class="btn${sel===null?" off":""}" ${sel===null?"disabled":""} onclick="confirmAns()">Подтвердить ответ</button></div></div>`;
+    }else body=`<div class="panel"><b>Время вышло.</b><small>Ждите следующий вопрос</small></div>`;
+  }else body=`<div class="panel wait"><span class="pulse"></span><span>Ждём первый вопрос</span></div>`;
+
+  $("#app").innerHTML=head+body+`<h3>Рейтинг компаний</h3><div class="panel"><div id="lb"></div></div>`;
+  drawLB();
+}
+
+async function mkTeam(){
+  const name=$("#nm").value.trim();if(!name)return;
+  const r=await api({action:"team",name});
+  if(r.error){tg?.showAlert?.(r.error);return;}
+  lastView="";hapN("success");render(r);
+}
+function selCo(c){pend=(pend===c?null:c);hap();render(lastData,true);}
+async function confirmCo(){
+  if(!pend)return;
+  document.querySelectorAll(".cor,.dock .btn").forEach(b=>b.disabled=true);
+  const r=await api({action:"company",company:pend});
+  if(r.error){tg?.showAlert?.(r.error);pend=null;lastKey="";refresh();return;}
+  pend=null;hapN("success");render(r);
+}
+function pick(i){sel=(sel===i?null:i);hap();render(lastData,true);}
+function toggleBet(){bet=!bet;hap();render(lastData,true);}
+async function confirmAns(){
+  if(sel===null)return;
+  document.querySelectorAll(".opt,.dock .btn,.sw").forEach(b=>b.disabled=true);
+  const r=await api({action:"answer",pos:sel,bet});
+  if(r.error){tg?.showAlert?.(r.error);lastKey="";refresh();return;}
+  hapN("success");render(r);
+}
+async function refresh(){
+  try{
+    const d=await api();
+    if(d.error==="auth"){$("#app").innerHTML=`<div class="panel"><h2>Игра открывается из бота</h2><p class="sub">Запустите её кнопкой в Telegram-боте.</p></div>`;return;}
+    render(d);
+  }catch(e){}
+}
+function initPlayer(){
+  refresh();loadTeams();
+  sb.channel("p").on("postgres_changes",{event:"*",schema:"public",table:"game_state"},refresh)
+    .on("postgres_changes",{event:"*",schema:"public",table:"teams"},()=>{loadTeams();refresh();}).subscribe();
+  setInterval(refresh,3000);
+}
+function initScreen(){
+  document.body.classList.add("screen");
+  $("#app").innerHTML=`<div class="shead"><h1>Биржа маркетинга</h1><div id="tp" class="stp"></div></div><div class="sgrid"><div><div id="tbox" class="tbox"><div id="tm" class="tm"></div><div class="fuse"><i id="bar"></i></div></div><div id="tx" class="q"></div></div><div id="lb"></div></div>`;
+  const upd=async()=>{
+    const{data}=await sb.from("game_state").select("*").eq("id",1).single();
+    st=data;
+    $("#tp").textContent=st.status==="lobby"?"Ожидание начала игры":(st.screen_topic||"");
+    $("#tx").textContent=st.screen_text||(st.status==="lobby"?"":"Вопрос на экранах команд");
+  };
+  upd();loadTeams();
+  sb.channel("s").on("postgres_changes",{event:"*",schema:"public",table:"game_state"},upd)
+    .on("postgres_changes",{event:"*",schema:"public",table:"teams"},loadTeams).subscribe();
+  setInterval(()=>{upd();loadTeams();},4000);
+}
+setInterval(()=>{
+  const el=$("#tm");if(!el||!st)return;
+  const box=$("#tbox"),b=$("#bar");
+  if(st.status!=="open"||!st.opened_at){
+    el.textContent=st.status==="closed"?"Приём закрыт":"";
+    if(b)b.style.width=st.status==="closed"?"0%":"100%";
+    box?.classList.remove("hot");return;
+  }
+  const total=st.seconds*1000;
+  const left=Math.max(0,new Date(st.opened_at).getTime()+total-(Date.now()+offset));
+  el.textContent=Math.ceil(left/1000);
+  if(b)b.style.width=(left/total*100)+"%";
+  box?.classList.toggle("hot",left<10000);
+},250);
+setInterval(()=>{
+  if(SCREEN||!st||st.status!=="open"||!st.opened_at||ticked===st.opened_at)return;
+  if(new Date(st.opened_at).getTime()+st.seconds*1000<Date.now()+offset){
+    ticked=st.opened_at;
+    setTimeout(()=>api({action:"tick"}).then(render),2500);
+  }
+},500);
+SCREEN?initScreen():initPlayer();
+</script></body></html>
